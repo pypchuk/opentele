@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from fsspec import AbstractFileSystem
+
 from .configs import *
 from . import shared as td
 
@@ -14,8 +16,9 @@ import logging
 
 
 class MapData(BaseObject):  # nocov
-    def __init__(self, basePath: str) -> None:
+    def __init__(self, filesystem: AbstractFileSystem, basePath: str) -> None:
 
+        self.filesystem = filesystem
         self.basePath = basePath
 
         self._draftsMap: Dict[PeerId, FileKey] = {}
@@ -54,7 +57,7 @@ class MapData(BaseObject):  # nocov
     def read(self, localKey: td.AuthKey, legacyPasscode: QByteArray) -> None:
 
         try:
-            mapData = td.Storage.ReadFile("map", self.basePath)
+            mapData = td.Storage.ReadFile(self.filesystem,"map", self.basePath)
         except OpenTeleException as e:
             raise TDataReadMapDataFailed(
                 "Could not read map data, find not found or couldn't be opened"
@@ -431,7 +434,7 @@ class StorageAccount(BaseObject):  # nocov
         )
         self.__localKey = None
 
-        self.__mapData = MapData(self.basePath)
+        self.__mapData = MapData(owner.owner.filesystem, self.basePath)
         self.__config = td.MTP.Config(td.MTP.Environment.Production)
         # self.mtpData = MtpData()
 
@@ -501,7 +504,7 @@ class StorageAccount(BaseObject):  # nocov
         # Intended for internal usage only
 
         # mtp = ReadEncryptedFile(ToFilePart(self.__dataNameKey), self.__basePath, self.localKey)
-        mtp = td.Storage.ReadEncryptedFile(td.Storage.ToFilePart(self.__dataNameKey), self.__baseGlobalPath, self.localKey)  # type: ignore
+        mtp = td.Storage.ReadEncryptedFile(self.owner.owner.filesystem, td.Storage.ToFilePart(self.__dataNameKey), self.__baseGlobalPath, self.localKey)  # type: ignore
 
         blockId = mtp.stream.readInt32()
 
@@ -519,7 +522,7 @@ class StorageAccount(BaseObject):  # nocov
         )
 
         try:
-            file = td.Storage.ReadEncryptedFile("config", self.basePath, self.localKey)  # type: ignore
+            file = td.Storage.ReadEncryptedFile(self.owner.owner.filesystem, "config", self.basePath, self.localKey)  # type: ignore
             serialized = QByteArray()
             file.stream >> serialized
 

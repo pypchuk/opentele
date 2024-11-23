@@ -1,4 +1,6 @@
 from __future__ import annotations
+
+from fsspec import AbstractFileSystem
 from .configs import *
 from . import shared as td
 
@@ -231,13 +233,13 @@ class Storage(BaseObject):
         return encrypted
 
     @staticmethod
-    def WriteFile(fileName: str, basePath: str, data: bytes):
+    def WriteFile(filesystem: AbstractFileSystem, fileName: str, basePath: str, data: bytes):
 
         dir = QDir(basePath)
         if not dir.exists():
             dir.mkpath(basePath)
 
-        file = QFile(Storage.PathJoin(basePath, fileName + "s"))
+        file = filesystem.open(Storage.PathJoin(basePath, fileName + "s"))
         if file.open(QIODevice.OpenModeFlag.WriteOnly):
             file.write(TDF_MAGIC)
             file.write(APP_VERSION.to_bytes(4, "little"))
@@ -248,17 +250,12 @@ class Storage(BaseObject):
         raise OpenTeleException("what")
 
     @staticmethod
-    def ReadFile(fileName: str, basePath: str) -> FileReadDescriptor:
-
+    def ReadFile(filesystem: AbstractFileSystem, fileName: str, basePath: str) -> FileReadDescriptor:
         to_try = ["s", "1", "0"]
         tries_exception = None
         for chr in to_try:
             try:
-
-                file = QFile(Storage.PathJoin(basePath, fileName + chr))
-                if not file.open(QIODevice.OpenModeFlag.ReadOnly):
-                    tries_exception = TFileNotFound(f"Could not open {fileName}")
-                    continue
+                file = filesystem.open(Storage.PathJoin(basePath, fileName + chr), mode="rb")
 
                 magic = file.read(4)
 
@@ -271,7 +268,7 @@ class Storage(BaseObject):
 
                 version = int.from_bytes(file.read(4), "little")
 
-                bytesdata = QByteArray(file.read(file.size()))
+                bytesdata = QByteArray(file.read(file.size))
 
                 dataSize = bytesdata.size() - 16
 
@@ -314,10 +311,10 @@ class Storage(BaseObject):
 
     @staticmethod
     def ReadEncryptedFile(
-        fileName: str, basePath: str, authKey: td.AuthKey
+            filesystem: AbstractFileSystem, fileName: str, basePath: str, authKey: td.AuthKey
     ) -> FileReadDescriptor:
 
-        result = Storage.ReadFile(fileName, basePath)
+        result = Storage.ReadFile(filesystem, fileName, basePath)
         encrypted = QByteArray()
         result.stream >> encrypted
 
@@ -564,13 +561,8 @@ class Storage(BaseObject):
 
     @staticmethod
     def GetAbsolutePath(path: str = None) -> str:
-
-        if path == None or path == "":
-            path = os.getcwd()
-
-        path = os.path.abspath(path)
-        return path
+        return path or ""
 
     @staticmethod
     def PathJoin(path: str, filename: str) -> str:
-        return os.path.join(path, filename)
+        return path + "/" + filename

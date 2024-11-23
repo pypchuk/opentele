@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import fsspec
 
 from .configs import *
 from . import shared as td
@@ -101,6 +102,7 @@ class TDesktop(BaseObject):
 
     def __init__(
         self,
+        filesystem: fsspec.AbstractFileSystem,
         basePath: str = None,
         api: Union[Type[APIData], APIData] = API.TelegramDesktop,
         passcode: str = None,
@@ -124,6 +126,7 @@ class TDesktop(BaseObject):
                 See `keyFile`.
         """
         self.__accounts: typing.List[td.Account] = []
+        self.__filesystem = filesystem
         self.__basePath = basePath
         self.__keyFile = keyFile if (keyFile != None) else TDesktop.kDefaultKeyFile
         self.__passcode = passcode if (passcode != None) else str("")
@@ -404,7 +407,7 @@ class TDesktop(BaseObject):
         self.accounts.clear()
 
         # READ KEY_DATA
-        keyData = td.Storage.ReadFile("key_" + self.keyFile, self.basePath)  # type: ignore
+        keyData = td.Storage.ReadFile(self.__filesystem, "key_" + self.keyFile, self.basePath)  # type: ignore
 
         salt, keyEncrypted, infoEncrypted = QByteArray(), QByteArray(), QByteArray()
 
@@ -651,6 +654,10 @@ class TDesktop(BaseObject):
     ### Notes:
         Note: Performance mode will be disabled if `passcode` is set.
     """
+
+    @property
+    def filesystem(self) -> fsspec.AbstractFileSystem:
+        return self.__filesystem
 
     @property
     def api(self) -> APIData:
